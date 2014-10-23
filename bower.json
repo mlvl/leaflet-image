@@ -1,0 +1,9 @@
+{
+  "name": "leaflet-image",
+  "ignore": [],
+  "dependencies": {},
+  "main": "leaflet-image.js",
+  "scripts": [
+    "leaflet-image.js"
+  ]
+}
