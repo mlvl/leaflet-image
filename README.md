@@ -1,3 +1,10 @@
+#leaflet-image MLVL Fork
+
+* Handles WMS tiles
+* Works with [Leaflet.MakiMarkers](https://github.com/jseppi/Leaflet.MakiMarkers) and [Leaflet.markercluster](https://github.com/Leaflet/Leaflet.markercluster)
+
+#Original README
+
 ## leaflet-image
 
 Export images out of Leaflet maps without a server component, by using

@@ -5,8 +5,7 @@ var queue = _dereq_('./queue');
 module.exports = function leafletImage(map, callback) {
 
     var dimensions = map.getSize(),
-        layerQueue = new queue(1),
-        ts = new Date();
+        layerQueue = new queue(1);
 
     var canvas = document.createElement('canvas');
     canvas.width = dimensions.x;
@@ -21,13 +20,15 @@ module.exports = function leafletImage(map, callback) {
     layerQueue.awaitAll(layersDone);
 
     function drawTileLayer(l) {
-        if (l instanceof L.TileLayer) layerQueue.defer(handleTileLayer, l);
-        else if (l._heat) layerQueue.defer(handlePathRoot, l._canvas);
+        if (l.wmsParams) layerQueue.defer(handleTileLayer, l);
     }
 
     function drawMarkerLayer(l) {
         if (l instanceof L.Marker && l.options.icon instanceof L.Icon) {
             layerQueue.defer(handleMarkerLayer, l);
+        }
+        else if (l instanceof L.Marker && l.options.icon._icon.className.indexOf("marker-cluster") !== -1) {
+            layerQueue.defer(handleClusterLayer, l);
         }
     }
 
@@ -47,7 +48,6 @@ module.exports = function leafletImage(map, callback) {
 
     function handleTileLayer(layer, callback) {
         var canvas = document.createElement('canvas');
-
         canvas.width = dimensions.x;
         canvas.height = dimensions.y;
 
@@ -58,9 +58,7 @@ module.exports = function leafletImage(map, callback) {
             tileSize = layer.options.tileSize;
 
         if (zoom > layer.options.maxZoom ||
-            zoom < layer.options.minZoom ||
-            // mapbox.tileLayer
-            (layer.options.format && !layer.options.tiles)) {
+            zoom < layer.options.minZoom) {
             return callback();
         }
 
@@ -146,16 +144,16 @@ module.exports = function leafletImage(map, callback) {
             pixelPoint = map.project(marker.getLatLng()),
             url = addCacheString(marker._icon.src),
             im = new Image(),
-            options = marker.options.icon.options,
-            size = options.iconSize,
-            pos = pixelPoint.subtract(minPoint),
-            anchor = L.point(options.iconAnchor || size && size.divideBy(2, true)),
-            x = pos.x - size[0] + anchor.x,
-            y = pos.y - anchor.y;
+            options = marker.options.icon.options;
 
-        canvas.width = dimensions.x;
-        canvas.height = dimensions.y;
-        im.crossOrigin = '';
+        var size = options.iconSize;
+        var pos = pixelPoint.subtract(minPoint);
+        var anchor = L.point(marker.feature.geometry.coordinates),
+            x = pos.x - size[0] / 2,
+            y = pos.y - size[1] / 2;
+            canvas.width = dimensions.x;
+            canvas.height = dimensions.y;
+            im.crossOrigin = '';
 
         im.onload = function() {
             ctx.drawImage(this, x, y, size[0], size[1]);
@@ -167,8 +165,60 @@ module.exports = function leafletImage(map, callback) {
         im.src = url;
     }
 
+    function handleClusterLayer(marker, callback) {
+        var canvas = document.createElement('canvas'),
+            ctx = canvas.getContext('2d'),
+            pixelBounds = map.getPixelBounds(),
+            minPoint = new L.Point(pixelBounds.min.x, pixelBounds.min.y);
+        var pixelPoint = map.project(marker.getLatLng());
+        var size = marker._icon.clientWidth;
+        var pos = pixelPoint.subtract(minPoint);
+        var anchor = marker.getLatLng(),
+            x = pos.x,
+            y = pos.y;
+        canvas.width = dimensions.x;
+        canvas.height = dimensions.y;
+
+        var classd = marker.options.icon._icon.className.split(" ")[2];
+        var ocolor, icolor;
+        if (classd === "marker-cluster-small") {
+            icolor = "rgba(181, 226, 140, 0.6)";
+            ocolor = "rgba(110, 204, 57, 0.6)";
+        }
+        else if (classd === "marker-cluster-medium") {
+            icolor = "rgba(241, 211, 87, 0.6)";
+            ocolor = "rgba(240, 194, 12, 0.6)";
+        }
+        else if (classd === "marker-cluster-large") {
+            icolor = "rgba(253, 156, 115, 0.6)";
+            ocolor = "rgba(241, 128, 23, 0.6)";
+        }
+        else {
+            icolor = "white";
+            ocolor = "white";
+        }
+        // outter circle
+        ctx.arc(x, y, (size-4) / 2, 0, Math.PI * 2, true);
+        ctx.fillStyle = icolor;
+        ctx.fill();
+
+        ctx.arc(x, y, (size-4) / 2, 0, Math.PI * 2, true);
+        ctx.strokeStyle = ocolor;
+        ctx.lineWidth = 5;
+        ctx.stroke();      
+
+        var number = marker.options.icon._icon.innerText;
+        ctx.font = "12px Helvetica, Arial, sans-serif";
+        ctx.fillStyle = "black";
+        var len = ctx.measureText(number).width;
+        ctx.fillText(number, x - len/2 + 2, y + 6);
+        callback(null, {
+            canvas: canvas
+        });
+    }
+
     function addCacheString(url) {
-        return url + ((url.match(/\?/)) ? '&' : '?') + 'cache=' + (+ts);
+        return url + ((url.match(/\?/)) ? '&' : '?') + 'cache=' + (+new Date());
     }
 };
 
