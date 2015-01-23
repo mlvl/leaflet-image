@@ -20,7 +20,7 @@ module.exports = function leafletImage(map, callback) {
     layerQueue.awaitAll(layersDone);
 
     function drawTileLayer(l) {
-        if (l.wmsParams) layerQueue.defer(handleTileLayer, l);
+        if (l.wmsParams || l._tiles) layerQueue.defer(handleTileLayer, l);
     }
 
     function drawMarkerLayer(l) {
